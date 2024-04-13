@@ -26,13 +26,11 @@ func NewScript(content string, shell string, arg ...string) *Script {
 	}
 }
 
-// Run executes the script.
-//
-// See [Cmd.Run for opt.
-func (s Script) Run(ctx context.Context, opt ...Option) (*Result, error) {
+// Runner creates a new [Cmd] and pass it to f.
+func (s Script) Runner(f func(*Cmd) error) error {
 	fp, err := os.CreateTemp("", "execx")
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer func() {
 		_ = os.Remove(fp.Name())
@@ -44,11 +42,26 @@ func (s Script) Run(ctx context.Context, opt ...Option) (*Result, error) {
 	cmd.Dir = s.Dir
 
 	if _, err := io.WriteString(fp, cmd.Env.Expand(s.Content)); err != nil {
-		return nil, err
+		return err
 	}
 	if err := os.Chmod(fp.Name(), 0755); err != nil {
-		return nil, err
+		return err
 	}
 
-	return cmd.Run(ctx, opt...)
+	return f(cmd)
+}
+
+// Run executes the script.
+//
+// See [Cmd.Run] for opt.
+func (s Script) Run(ctx context.Context, opt ...Option) (*Result, error) {
+	var result *Result
+	if err := s.Runner(func(cmd *Cmd) error {
+		r, err := cmd.Run(ctx, opt...)
+		result = r
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
