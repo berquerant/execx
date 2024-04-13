@@ -50,7 +50,7 @@ from stdin
 	})
 }
 
-func ExampleScript_Run() {
+func ExampleScript_Runner() {
 	script := execx.NewScript(
 		`echo line1
 echo ${line2}
