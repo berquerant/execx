@@ -36,7 +36,7 @@ func New(name string, arg ...string) *Cmd {
 	return &Cmd{
 		Args: append([]string{name}, arg...),
 		Dir:  ".",
-		Env:  EnvFromEnviron(),
+		Env:  NewEnv(),
 	}
 }
 
