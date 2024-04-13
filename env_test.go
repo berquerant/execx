@@ -83,4 +83,11 @@ func TestEnv(t *testing.T) {
 			"$SUBJECT went to $LOCATION2",
 		}))
 	})
+
+	t.Run("append", func(t *testing.T) {
+		e := execx.NewEnv()
+		e.Set("A", "a")
+		e.Set("A", "b$A")
+		assert.Equal(t, "ba", e.Expand("$A"))
+	})
 }

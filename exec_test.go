@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"testing"
 
@@ -45,6 +46,16 @@ func TestCmd(t *testing.T) {
 			cancel()
 			_, err := execx.New("sleep", "1").Run(ctx)
 			assert.ErrorIs(t, err, context.Canceled)
+		})
+
+		t.Run("append", func(t *testing.T) {
+			os.Setenv("test_cmd_append_env1", "append1")
+			cmd := execx.New("echo", "${test_cmd_append_env1}")
+			cmd.Env.Merge(execx.EnvFromEnviron())
+			cmd.Env.Set("test_cmd_append_env1", "added:${test_cmd_append_env1}")
+			r, err := cmd.Run(context.TODO())
+			assert.Nil(t, err)
+			assertReader(t, bytes.NewBufferString("added:append1\n"), r.Stdout)
 		})
 
 		for _, tc := range []struct {

@@ -38,12 +38,15 @@ func (e Env) Get(key string) (string, bool) {
 }
 
 func (e Env) Set(key, value string) {
+	if _, ok := e[key]; ok {
+		value = e.Expand(value)
+	}
 	e[key] = value
 }
 
 func (e Env) Merge(other Env) {
 	for k, v := range other {
-		e[k] = v
+		e.Set(k, v)
 	}
 }
 
