@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"strings"
+	"io"
 	"testing"
 
 	"github.com/berquerant/execx"
@@ -18,6 +18,7 @@ func TestScript(t *testing.T) {
 echo ${line2}
 cat -
 echo line3 > /dev/stderr`
+			stdin      = "from stdin\n"
 			wantStdout = `line1
 LINE2
 from stdin
@@ -26,25 +27,26 @@ from stdin
 `
 		)
 		script := execx.NewScript(content, "sh")
-		script.Stdin = bytes.NewBufferString("from stdin\n")
 		script.Env.Set("line2", "LINE2")
 
 		var (
-			outLines []string
-			errLines []string
+			stdout io.Reader
+			stderr io.Reader
 		)
 
-		got, err := script.Run(context.TODO(), execx.WithStdoutConsumer(func(x string) {
-			outLines = append(outLines, x)
-		}), execx.WithStderrConsumer(func(x string) {
-			errLines = append(errLines, x)
+		assert.Nil(t, script.Runner(func(cmd *execx.Cmd) error {
+			cmd.Stdin = bytes.NewBufferString(stdin)
+			r, err := cmd.Run(context.TODO())
+			if err != nil {
+				return err
+			}
+			stdout = r.Stdout
+			stderr = r.Stderr
+			return nil
 		}))
-		assert.Nil(t, err)
 
-		assertReader(t, bytes.NewBufferString(wantStdout), got.Stdout)
-		assertReader(t, bytes.NewBufferString(wantStderr), got.Stderr)
-		assert.Equal(t, strings.Split(strings.TrimSpace(wantStdout), "\n"), outLines)
-		assert.Equal(t, strings.Split(strings.TrimSpace(wantStderr), "\n"), errLines)
+		assertReader(t, bytes.NewBufferString(wantStdout), stdout)
+		assertReader(t, bytes.NewBufferString(wantStderr), stderr)
 	})
 }
 
@@ -56,31 +58,27 @@ cat -
 echo line3 > /dev/stderr`,
 		"sh",
 	)
-	script.Stdin = bytes.NewBufferString("from stdin\n")
 	script.Env.Set("line2", "LINE2")
 
-	var (
-		outLines []string
-		errLines []string
-	)
-
-	if _, err := script.Run(
-		context.TODO(),
-		execx.WithStdoutConsumer(func(x string) {
-			outLines = append(outLines, x)
-		}), execx.WithStderrConsumer(func(x string) {
-			errLines = append(errLines, x)
-		})); err != nil {
+	if err := script.Runner(func(cmd *execx.Cmd) error {
+		cmd.Stdin = bytes.NewBufferString("from stdin\n")
+		_, err := cmd.Run(
+			context.TODO(),
+			execx.WithStdoutConsumer(func(x string) {
+				fmt.Printf("1:%s\n", x)
+			}),
+			execx.WithStderrConsumer(func(x string) {
+				fmt.Printf("2:%s\n", x)
+			}),
+		)
+		return err
+	}); err != nil {
 		panic(err)
 	}
 
-	fmt.Println(strings.Join(outLines, "\n"))
-	fmt.Println("---")
-	fmt.Println(strings.Join(errLines, "\n"))
 	// Output:
-	// line1
-	// LINE2
-	// from stdin
-	// ---
-	// line3
+	// 1:line1
+	// 1:LINE2
+	// 1:from stdin
+	// 2:line3
 }
