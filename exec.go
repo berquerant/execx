@@ -83,7 +83,7 @@ func (c Cmd) Run(ctx context.Context, opt ...Option) (*Result, error) {
 	result.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("%w: command rum", err)
+		return nil, fmt.Errorf("%w: command run", err)
 	}
 	return result, nil
 }
