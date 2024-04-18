@@ -11,7 +11,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//go:generate go run github.com/berquerant/goconfig@v0.3.0 -field "StdoutConsumer func(string)|StderrConsumer func(string)" -option -output exec_config_generated.go -configOption Option
+//go:generate go run github.com/berquerant/goconfig@v0.3.0 -field "StdoutConsumer func(Token)|StderrConsumer func(Token)" -option -output exec_config_generated.go -configOption Option
 
 // Cmd is an external command.
 type Cmd struct {
@@ -27,6 +27,25 @@ type Result struct {
 	ExpandedArgs []string
 	Stdout       io.Reader
 	Stderr       io.Reader
+}
+
+type Token interface {
+	String() string
+	Bytes() []byte
+}
+
+var (
+	_ Token = token("")
+)
+
+type token string
+
+func (t token) String() string {
+	return string(t)
+}
+
+func (t token) Bytes() []byte {
+	return []byte(string(t))
 }
 
 // Create a new [Cmd].
@@ -63,8 +82,8 @@ func (c Cmd) Run(ctx context.Context, opt ...Option) (*Result, error) {
 	defer cancel()
 
 	config := NewConfigBuilder().
-		StdoutConsumer(func(string) {}).
-		StderrConsumer(func(string) {}).
+		StdoutConsumer(func(Token) {}).
+		StderrConsumer(func(Token) {}).
 		Build()
 	config.Apply(opt...)
 
@@ -116,7 +135,7 @@ func (c Cmd) runWithLineConsumers(ctx context.Context, cfg *Config) (*Result, er
 		for scanner.Scan() {
 			line := scanner.Text()
 			fmt.Fprintln(&outBuf, line)
-			cfg.StdoutConsumer.Get()(line)
+			cfg.StdoutConsumer.Get()(token(line))
 		}
 		return scanner.Err()
 	})
@@ -125,7 +144,7 @@ func (c Cmd) runWithLineConsumers(ctx context.Context, cfg *Config) (*Result, er
 		for scanner.Scan() {
 			line := scanner.Text()
 			fmt.Fprintln(&errBuf, line)
-			cfg.StderrConsumer.Get()(line)
+			cfg.StderrConsumer.Get()(token(line))
 		}
 		return scanner.Err()
 	})

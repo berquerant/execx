@@ -26,10 +26,10 @@ echo line3 > /dev/stderr`,
 		cmd.Stdin = bytes.NewBufferString("from stdin\n")
 		_, err := cmd.Run(
 			context.TODO(),
-			execx.WithStdoutConsumer(func(x string) {
+			execx.WithStdoutConsumer(func(x execx.Token) {
 				fmt.Printf("1:%s\n", x)
 			}),
-			execx.WithStderrConsumer(func(x string) {
+			execx.WithStderrConsumer(func(x execx.Token) {
 				fmt.Printf("2:%s\n", x)
 			}),
 		)

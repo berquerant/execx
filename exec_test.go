@@ -29,8 +29,8 @@ func TestCmd(t *testing.T) {
 		c.Stdin = bytes.NewBufferString("line1\nline2\n")
 
 		var lines []string
-		got, err := c.Run(context.TODO(), execx.WithStdoutConsumer(func(x string) {
-			lines = append(lines, x)
+		got, err := c.Run(context.TODO(), execx.WithStdoutConsumer(func(x execx.Token) {
+			lines = append(lines, x.String())
 		}))
 
 		assert.Nil(t, err)
