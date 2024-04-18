@@ -26,6 +26,66 @@ func TestCmd(t *testing.T) {
 	based := t.TempDir()
 
 	t.Run("RunWithConsumer", func(t *testing.T) {
+		t.Run("Separator", func(t *testing.T) {
+			for _, tc := range []struct {
+				name       string
+				stdin      io.Reader
+				opt        []execx.Option
+				want       []string
+				wantResult io.Reader
+			}{
+				{
+					name:  "lines",
+					stdin: bytes.NewBufferString("line1\nline2"),
+					opt:   []execx.Option{},
+					want: []string{
+						"line1",
+						"line2",
+					},
+					wantResult: bytes.NewBufferString("line1\nline2"),
+				},
+				{
+					name:  "csv lines",
+					stdin: bytes.NewBufferString("line1\nline2"),
+					opt: []execx.Option{
+						execx.WithSplitSeparator([]byte(",")),
+					},
+					want: []string{
+						"line1",
+						"line2",
+					},
+					wantResult: bytes.NewBufferString("line1,line2"),
+				},
+				{
+					name:  "csv",
+					stdin: bytes.NewBufferString("line1"),
+					opt: []execx.Option{
+						execx.WithSplitSeparator([]byte(",")),
+					},
+					want: []string{
+						"line1",
+					},
+					wantResult: bytes.NewBufferString("line1"),
+				},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					c := execx.New("cat", "-")
+					c.Stdin = tc.stdin
+					var (
+						lines []string
+						opt   = append(tc.opt, execx.WithStdoutConsumer(func(x execx.Token) {
+							lines = append(lines, x.String())
+						}))
+					)
+					got, err := c.Run(context.TODO(), opt...)
+
+					assert.Nil(t, err)
+					assert.Equal(t, tc.want, lines)
+					assertReader(t, tc.wantResult, got.Stdout)
+				})
+			}
+		})
+
 		for _, tc := range []struct {
 			name  string
 			stdin io.Reader

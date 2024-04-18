@@ -11,7 +11,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//go:generate go run github.com/berquerant/goconfig@v0.3.0 -field "StdoutConsumer func(Token)|StderrConsumer func(Token)|SplitFunc SplitFunc" -option -output exec_config_generated.go -configOption Option
+//go:generate go run github.com/berquerant/goconfig@v0.3.0 -field "StdoutConsumer func(Token)|StderrConsumer func(Token)|SplitFunc SplitFunc|SplitSeparator []byte" -option -output exec_config_generated.go -configOption Option
 
 // Cmd is an external command.
 type Cmd struct {
@@ -37,17 +37,17 @@ type Token interface {
 }
 
 var (
-	_ Token = token("")
+	_ Token = token(nil)
 )
 
-type token string
+type token []byte
 
 func (t token) String() string {
 	return string(t)
 }
 
 func (t token) Bytes() []byte {
-	return []byte(string(t))
+	return []byte(t)
 }
 
 // Create a new [Cmd].
@@ -79,7 +79,9 @@ func (c Cmd) prepare(ctx context.Context) (*exec.Cmd, *Result) {
 //
 // If [WithStdoutConsumer] set, you can get the standard output of a command without waiting for the command to finish.
 // If [WithStderrConsumer] set, you can get the standard error of a command without waiting for the command to finish.
-// [WithSplitFunc] sets the split function for a scanner used in consumers.
+// [WithSplitFunc] sets the split function for a scanner used in consumers, default is [bufio.ScanLines].
+// [WithSplitSeparator] sets the separator inserted between tokens when concatenating tokens passed to consumers,
+// default is `[]byte("\n")`.
 func (c Cmd) Run(ctx context.Context, opt ...Option) (*Result, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -88,6 +90,7 @@ func (c Cmd) Run(ctx context.Context, opt ...Option) (*Result, error) {
 		StdoutConsumer(func(Token) {}).
 		StderrConsumer(func(Token) {}).
 		SplitFunc(bufio.ScanLines).
+		SplitSeparator([]byte("\n")).
 		Build()
 	config.Apply(opt...)
 
@@ -130,35 +133,38 @@ func (c Cmd) runWithLineConsumers(ctx context.Context, cfg *Config) (*Result, er
 		return nil, fmt.Errorf("%w: stderr pipe", err)
 	}
 
+	var (
+		newScanner = func(r io.Reader) *bufio.Scanner {
+			s := bufio.NewScanner(r)
+			s.Split(cfg.SplitFunc.Get())
+			return s
+		}
+		worker = func(w io.Writer, r io.Reader, consumer func(Token)) func() error {
+			var isTail bool
+			return func() error {
+				scanner := newScanner(r)
+				for scanner.Scan() {
+					line := token(scanner.Bytes())
+					if isTail {
+						_, _ = w.Write(append(cfg.SplitSeparator.Get(), line.Bytes()...))
+					} else {
+						isTail = true
+						_, _ = w.Write(line.Bytes())
+					}
+					consumer(line)
+				}
+				return scanner.Err()
+			}
+		}
+	)
+
 	eg, _ := errgroup.WithContext(ctx)
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("%w: command start", err)
 	}
 
-	newScanner := func(r io.Reader) *bufio.Scanner {
-		s := bufio.NewScanner(r)
-		s.Split(cfg.SplitFunc.Get())
-		return s
-	}
-
-	eg.Go(func() error {
-		scanner := newScanner(stdout)
-		for scanner.Scan() {
-			line := scanner.Text()
-			fmt.Fprintln(&outBuf, line)
-			cfg.StdoutConsumer.Get()(token(line))
-		}
-		return scanner.Err()
-	})
-	eg.Go(func() error {
-		scanner := newScanner(stderr)
-		for scanner.Scan() {
-			line := scanner.Text()
-			fmt.Fprintln(&errBuf, line)
-			cfg.StderrConsumer.Get()(token(line))
-		}
-		return scanner.Err()
-	})
+	eg.Go(worker(&outBuf, stdout, cfg.StdoutConsumer.Get()))
+	eg.Go(worker(&errBuf, stderr, cfg.StderrConsumer.Get()))
 
 	if err := eg.Wait(); err != nil {
 		return nil, fmt.Errorf("%w: read wait", err)
