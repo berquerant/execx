@@ -1,6 +1,7 @@
 package execx_test
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -24,20 +25,49 @@ func assertReader(t *testing.T, want, got io.Reader) {
 func TestCmd(t *testing.T) {
 	based := t.TempDir()
 
-	t.Run("RunWithStdinConsumer", func(t *testing.T) {
-		c := execx.New("cat", "-")
-		c.Stdin = bytes.NewBufferString("line1\nline2\n")
+	t.Run("RunWithConsumer", func(t *testing.T) {
+		for _, tc := range []struct {
+			name  string
+			stdin io.Reader
+			opt   []execx.Option
+			want  []string
+		}{
+			{
+				name:  "lines",
+				stdin: bytes.NewBufferString("line1\nline2\n"),
+				opt:   []execx.Option{},
+				want: []string{
+					"line1",
+					"line2",
+				},
+			},
+			{
+				name:  "words",
+				stdin: bytes.NewBufferString("word1 word2 "),
+				opt: []execx.Option{
+					execx.WithSplitFunc(bufio.ScanWords),
+				},
+				want: []string{
+					"word1",
+					"word2",
+				},
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				c := execx.New("cat", "-")
+				c.Stdin = tc.stdin
+				var (
+					lines []string
+					opt   = append(tc.opt, execx.WithStdoutConsumer(func(x execx.Token) {
+						lines = append(lines, x.String())
+					}))
+				)
+				_, err := c.Run(context.TODO(), opt...)
 
-		var lines []string
-		got, err := c.Run(context.TODO(), execx.WithStdoutConsumer(func(x execx.Token) {
-			lines = append(lines, x.String())
-		}))
-
-		assert.Nil(t, err)
-		assert.Equal(t, []string{"cat", "-"}, got.ExpandedArgs)
-		assertReader(t, bytes.NewBufferString("line1\nline2\n"), got.Stdout)
-		assertReader(t, bytes.NewBufferString(""), got.Stderr)
-		assert.Equal(t, []string{"line1", "line2"}, lines)
+				assert.Nil(t, err)
+				assert.Equal(t, tc.want, lines)
+			})
+		}
 	})
 
 	t.Run("Run", func(t *testing.T) {

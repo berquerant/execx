@@ -11,7 +11,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//go:generate go run github.com/berquerant/goconfig@v0.3.0 -field "StdoutConsumer func(Token)|StderrConsumer func(Token)" -option -output exec_config_generated.go -configOption Option
+//go:generate go run github.com/berquerant/goconfig@v0.3.0 -field "StdoutConsumer func(Token)|StderrConsumer func(Token)|SplitFunc SplitFunc" -option -output exec_config_generated.go -configOption Option
 
 // Cmd is an external command.
 type Cmd struct {
@@ -28,6 +28,8 @@ type Result struct {
 	Stdout       io.Reader
 	Stderr       io.Reader
 }
+
+type SplitFunc = bufio.SplitFunc
 
 type Token interface {
 	String() string
@@ -77,6 +79,7 @@ func (c Cmd) prepare(ctx context.Context) (*exec.Cmd, *Result) {
 //
 // If [WithStdoutConsumer] set, you can get the standard output of a command without waiting for the command to finish.
 // If [WithStderrConsumer] set, you can get the standard error of a command without waiting for the command to finish.
+// [WithSplitFunc] sets the split function for a scanner used in consumers.
 func (c Cmd) Run(ctx context.Context, opt ...Option) (*Result, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -84,6 +87,7 @@ func (c Cmd) Run(ctx context.Context, opt ...Option) (*Result, error) {
 	config := NewConfigBuilder().
 		StdoutConsumer(func(Token) {}).
 		StderrConsumer(func(Token) {}).
+		SplitFunc(bufio.ScanLines).
 		Build()
 	config.Apply(opt...)
 
@@ -130,8 +134,15 @@ func (c Cmd) runWithLineConsumers(ctx context.Context, cfg *Config) (*Result, er
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("%w: command start", err)
 	}
+
+	newScanner := func(r io.Reader) *bufio.Scanner {
+		s := bufio.NewScanner(r)
+		s.Split(cfg.SplitFunc.Get())
+		return s
+	}
+
 	eg.Go(func() error {
-		scanner := bufio.NewScanner(stdout)
+		scanner := newScanner(stdout)
 		for scanner.Scan() {
 			line := scanner.Text()
 			fmt.Fprintln(&outBuf, line)
@@ -140,7 +151,7 @@ func (c Cmd) runWithLineConsumers(ctx context.Context, cfg *Config) (*Result, er
 		return scanner.Err()
 	})
 	eg.Go(func() error {
-		scanner := bufio.NewScanner(stderr)
+		scanner := newScanner(stderr)
 		for scanner.Scan() {
 			line := scanner.Text()
 			fmt.Fprintln(&errBuf, line)
