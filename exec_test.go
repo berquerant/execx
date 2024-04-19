@@ -131,6 +131,49 @@ func TestCmd(t *testing.T) {
 	})
 
 	t.Run("Run", func(t *testing.T) {
+		t.Run("earlystop", func(t *testing.T) {
+			const (
+				input = "1,2,die,4"
+				want  = "1,2"
+			)
+			var (
+				wantLines = []string{"1", "2"}
+			)
+
+			split := func(data []byte, atEOF bool) (int, []byte, error) {
+				i := bytes.IndexByte(data, ',')
+				if i == -1 {
+					if !atEOF {
+						return 0, nil, nil
+					}
+					return 0, data, bufio.ErrFinalToken
+				}
+
+				if string(data[:i]) == "die" {
+					return i + 1, nil, bufio.ErrFinalToken
+				}
+
+				return i + 1, data[:i], nil
+			}
+
+			var outLines []string
+
+			cmd := execx.New("cat", "-")
+			cmd.Stdin = bytes.NewBufferString(input)
+			got, err := cmd.Run(
+				context.TODO(),
+				execx.WithSplitFunc(split),
+				execx.WithSplitSeparator([]byte(",")),
+				execx.WithStdoutConsumer(func(x execx.Token) {
+					outLines = append(outLines, x.String())
+				}),
+			)
+
+			assert.Nil(t, err)
+			assert.Equal(t, wantLines, outLines)
+			assertReader(t, got.Stdout, bytes.NewBufferString(want))
+		})
+
 		t.Run("cancel", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.TODO())
 			cancel()
