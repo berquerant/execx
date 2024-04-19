@@ -168,8 +168,24 @@ func TestCmd(t *testing.T) {
 			)
 
 			assert.Nil(t, err)
-			assert.Equal(t, wantLines, outLines)
-			assertReader(t, got.Stdout, bytes.NewBufferString(want))
+
+			if len(outLines) == 3 {
+				// for go 1.21
+				// https://go.dev/doc/go1.22:
+				//   Previously, it would report a final empty token before stopping
+				assert.Equal(t, wantLines, outLines[:2])
+			} else {
+				assert.Equal(t, wantLines, outLines)
+			}
+
+			gotString, err := io.ReadAll(got.Stdout)
+			assert.Nil(t, err)
+			if len(gotString) == 4 {
+				// for go 1.21
+				assert.Equal(t, want, string([]rune(string(gotString))[:3]))
+			} else {
+				assert.Equal(t, want, string(gotString))
+			}
 		})
 
 		t.Run("cancel", func(t *testing.T) {
