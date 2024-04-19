@@ -11,7 +11,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//go:generate go run github.com/berquerant/goconfig@v0.3.0 -field "StdoutConsumer func(Token)|StderrConsumer func(Token)|SplitFunc SplitFunc|SplitSeparator []byte" -option -output exec_config_generated.go -configOption Option
+//go:generate go run github.com/berquerant/goconfig@v0.3.0 -field "StdoutConsumer func(Token)|StderrConsumer func(Token)|SplitFunc SplitFunc|SplitSeparator []byte|StdoutWriter io.Writer|StderrWriter io.Writer" -option -output exec_config_generated.go -configOption Option
 
 // Cmd is an external command.
 type Cmd struct {
@@ -75,6 +75,32 @@ func (c Cmd) prepare(ctx context.Context) (*exec.Cmd, *Result) {
 	return cmd, result
 }
 
+func (Cmd) prepareWriter(result *Result, cfg *Config) (stdout, stderr io.Writer) {
+	var (
+		stdoutBuf bytes.Buffer
+		stderrBuf bytes.Buffer
+	)
+	result.Stdout = &stdoutBuf
+	result.Stderr = &stderrBuf
+
+	if cfg.StdoutWriter.IsModified() {
+		// write to given writer instead of stdoutBuf
+		// result.Stdout will be empty
+		stdout = cfg.StdoutWriter.Get()
+	} else {
+		stdout = &stdoutBuf
+	}
+
+	if cfg.StderrWriter.IsModified() {
+		// write to given writer instead of stderrBuf
+		// result.Stderr will be empty
+		stderr = cfg.StderrWriter.Get()
+	} else {
+		stderr = &stderrBuf
+	}
+	return
+}
+
 // Run executes the command.
 //
 // If [WithStdoutConsumer] set, you can get the standard output of a command without waiting for the command to finish.
@@ -82,6 +108,8 @@ func (c Cmd) prepare(ctx context.Context) (*exec.Cmd, *Result) {
 // [WithSplitFunc] sets the split function for a scanner used in consumers, default is [bufio.ScanLines].
 // [WithSplitSeparator] sets the separator inserted between tokens when concatenating tokens passed to consumers,
 // default is `[]byte("\n")`.
+// If [WithStdoutWriter] set, write the standard output into it instead of [Result.Stdout].
+// If [WithStderrWriter] set, write the standard error into it instead of [Result.Stderr].
 func (c Cmd) Run(ctx context.Context, opt ...Option) (*Result, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -91,22 +119,29 @@ func (c Cmd) Run(ctx context.Context, opt ...Option) (*Result, error) {
 		StderrConsumer(func(Token) {}).
 		SplitFunc(bufio.ScanLines).
 		SplitSeparator([]byte("\n")).
+		StdoutWriter(nil).
+		StderrWriter(nil).
 		Build()
 	config.Apply(opt...)
 
+	var (
+		cmd, result    = c.prepare(ctx)
+		stdout, stderr = c.prepareWriter(result, config)
+	)
+
 	if config.StdoutConsumer.IsModified() || config.StderrConsumer.IsModified() {
-		return c.runWithLineConsumers(ctx, config)
+		return c.runWithLineConsumers(
+			ctx,
+			config,
+			cmd,
+			result,
+			stdout,
+			stderr,
+		)
 	}
 
-	var (
-		cmd, result = c.prepare(ctx)
-		stdout      bytes.Buffer
-		stderr      bytes.Buffer
-	)
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	result.Stdout = &stdout
-	result.Stderr = &stderr
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
 
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("%w: command run", err)
@@ -114,20 +149,18 @@ func (c Cmd) Run(ctx context.Context, opt ...Option) (*Result, error) {
 	return result, nil
 }
 
-func (c Cmd) runWithLineConsumers(ctx context.Context, cfg *Config) (*Result, error) {
-	var (
-		cmd, result = c.prepare(ctx)
-		outBuf      bytes.Buffer
-		errBuf      bytes.Buffer
-	)
-
-	result.Stdout = &outBuf
-	result.Stderr = &errBuf
-
+func (c Cmd) runWithLineConsumers(
+	ctx context.Context,
+	cfg *Config,
+	cmd *exec.Cmd,
+	result *Result,
+	stdoutWriter, stderrWriter io.Writer,
+) (*Result, error) {
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, fmt.Errorf("%w: stdout pipe", err)
 	}
+
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		return nil, fmt.Errorf("%w: stderr pipe", err)
@@ -163,8 +196,8 @@ func (c Cmd) runWithLineConsumers(ctx context.Context, cfg *Config) (*Result, er
 		return nil, fmt.Errorf("%w: command start", err)
 	}
 
-	eg.Go(worker(&outBuf, stdout, cfg.StdoutConsumer.Get()))
-	eg.Go(worker(&errBuf, stderr, cfg.StderrConsumer.Get()))
+	eg.Go(worker(stdoutWriter, stdout, cfg.StdoutConsumer.Get()))
+	eg.Go(worker(stderrWriter, stderr, cfg.StderrConsumer.Get()))
 
 	if err := eg.Wait(); err != nil {
 		return nil, fmt.Errorf("%w: read wait", err)
