@@ -9,6 +9,7 @@ import (
 
 	"github.com/berquerant/execx"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/sync/errgroup"
 )
 
 func TestScript(t *testing.T) {
@@ -26,6 +27,26 @@ func TestScript(t *testing.T) {
 	}
 
 	t.Run("Runner", func(t *testing.T) {
+		t.Run("ConcurrentRace", func(t *testing.T) {
+			script := execx.NewScript("echo concurrent", "sh")
+			script.KeepScriptFile = true
+
+			var eg errgroup.Group
+			for i := 0; i < 8; i++ {
+				eg.Go(func() error {
+					return script.Runner(func(cmd *execx.Cmd) error {
+						r, err := cmd.Run(context.TODO())
+						if err != nil {
+							return err
+						}
+						assertReader(t, bytes.NewBufferString("concurrent\n"), r.Stdout)
+						return nil
+					})
+				})
+			}
+			assert.Nil(t, eg.Wait())
+		})
+
 		t.Run("ChangeScript", func(t *testing.T) {
 			t.Run("KeepScript", func(t *testing.T) {
 				script := execx.NewScript("echo keep", "sh")

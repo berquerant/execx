@@ -3,6 +3,7 @@ package execx
 import (
 	"fmt"
 	"os"
+	"sync"
 )
 
 // Script is an executable script, set of commands.
@@ -17,14 +18,17 @@ type Script struct {
 	KeepScriptFile bool
 
 	script *scriptFile
+	mux    *sync.Mutex
 }
 
 // NewScript creates a new [Script].
 func NewScript(content string, shell string, arg ...string) *Script {
+	var mux sync.Mutex
 	return &Script{
 		Shell:   append([]string{shell}, arg...),
 		Content: content,
 		Env:     NewEnv(),
+		mux:     &mux,
 	}
 }
 
@@ -38,15 +42,18 @@ func (s *Script) Close() error {
 	return nil
 }
 
-func (s Script) isExecutable() bool {
+func (s *Script) isExecutable() bool {
 	return s.script != nil && s.script.isExecutable()
 }
 
-func (s Script) requireNewScript() bool {
+func (s *Script) requireNewScript() bool {
 	return !s.isExecutable() || !s.KeepScriptFile
 }
 
 func (s *Script) newScript() error {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+
 	if !s.requireNewScript() {
 		return nil
 	}
