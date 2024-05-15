@@ -34,6 +34,9 @@ func NewScript(content string, shell string, arg ...string) *Script {
 
 // Close removes a temporary script file.
 func (s *Script) Close() error {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+
 	if s.script != nil {
 		x := s.script
 		s.script = nil
