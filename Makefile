@@ -1,5 +1,4 @@
 GOMOD = go mod
-GOBUILD = go build -trimpath -race -v
 GOTEST = go test -v -cover -race
 
 .PHONY: test
