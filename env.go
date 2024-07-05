@@ -3,6 +3,7 @@ package execx
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -63,27 +64,59 @@ func (e Env) IntoSlice() []string {
 	return result
 }
 
-func (e Env) get(key string) string {
-	if value, found := e[key]; found {
-		return value
-	}
-	// no changes
-	return fmt.Sprintf("${%s}", key)
-}
-
 const expandMaxAttempts = 10
 
 // Expand expands environment variables in target.
 func (e Env) Expand(target string) string {
 	var (
-		result string
-		count  int
+		originalTarget = target
+		result         string
+		count          int
+		missingKeys    = map[string]bool{}
 	)
-	for result = os.Expand(target, e.get); result != target && count < expandMaxAttempts; count++ {
-		target = result
-		result = os.Expand(result, e.get)
+
+	get := func(key string) string {
+		if value, found := e[key]; found {
+			return value
+		}
+		missingKeys[key] = true
+		return fmt.Sprintf("${%s}", key)
 	}
-	return result
+
+	for result = os.Expand(target, get); result != target && count < expandMaxAttempts; count++ {
+		target = result
+		result = os.Expand(result, get)
+	}
+
+	missingKey2Replaces := map[string][]bool{}
+	for key := range missingKeys {
+		// match with $var or ${var}
+		re, err := regexp.Compile(fmt.Sprintf(`\$(%[1]s|\{%[1]s\})`, key))
+		if err != nil {
+			continue
+		}
+		found := re.FindAllString(originalTarget, -1)
+		replaces := make([]bool, len(found))
+		for i, x := range found {
+			// true if original variable is raw (e.g. $var)
+			replaces[i] = !strings.Contains(x, "{")
+		}
+		missingKey2Replaces[key] = replaces
+	}
+
+	// revert missing variables to original format
+	countMap := map[string]int{}
+	replaceMissing := func(key string) string {
+		index := countMap[key]
+		countMap[key]++
+		if replaces, found := missingKey2Replaces[key]; found {
+			if index < len(replaces) && replaces[index] {
+				return fmt.Sprintf("$%s", key)
+			}
+		}
+		return fmt.Sprintf("${%s}", key)
+	}
+	return os.Expand(result, replaceMissing)
 }
 
 // ExpandStrings expands environment variables in multiple targets.
