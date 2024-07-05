@@ -75,6 +75,7 @@ func TestEnv(t *testing.T) {
 		assert.Equal(t, "value is $A ${A}", e.Expand("value is $A ${A}"))
 		assert.Equal(t, "c $A ${A} $B c ${B} ${A}X", e.Expand("$C $A ${A} $B ${C} ${B} ${A}X"))
 		assert.Equal(t, `'{printf "%s:%s", $1, $2}'`, e.Expand(`'{printf "%s:%s", $1, $2}'`))
+		assert.Equal(t, "$A $AB ${A} ${AB}", e.Expand("$A $AB ${A} ${AB}"))
 	})
 
 	t.Run("expand strings", func(t *testing.T) {

@@ -91,7 +91,7 @@ func (e Env) Expand(target string) string {
 	missingKey2Replaces := map[string][]bool{}
 	for key := range missingKeys {
 		// match with $var or ${var}
-		re, err := regexp.Compile(fmt.Sprintf(`\$(%[1]s|\{%[1]s\})`, key))
+		re, err := regexp.Compile(fmt.Sprintf(`\$(%[1]s\b|\{%[1]s\})`, key))
 		if err != nil {
 			continue
 		}
