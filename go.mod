@@ -4,7 +4,7 @@ go 1.21.3
 
 require (
 	github.com/berquerant/goconfig v0.3.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	golang.org/x/sync v0.9.0
 	golang.org/x/vuln v1.1.3
 )
