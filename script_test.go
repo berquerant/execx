@@ -27,6 +27,24 @@ func TestScript(t *testing.T) {
 	}
 
 	t.Run("Runner", func(t *testing.T) {
+		t.Run("PassArg", func(t *testing.T) {
+			script := execx.NewScript("echo arg=$*", "sh")
+			err := script.Runner(func(cmd *execx.Cmd) error {
+				cmd.Args = append(cmd.Args, "ARG")
+				r, err := cmd.Run(context.TODO())
+				if err != nil {
+					return err
+				}
+				b, err := io.ReadAll(r.Stdout)
+				if err != nil {
+					return err
+				}
+				assert.Equal(t, "arg=ARG\n", string(b))
+				return nil
+			})
+			assert.Nil(t, err)
+		})
+
 		t.Run("ConcurrentRace", func(t *testing.T) {
 			script := execx.NewScript("echo concurrent", "sh")
 			script.KeepScriptFile = true
