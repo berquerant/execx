@@ -1,6 +1,6 @@
 module github.com/berquerant/execx
 
-go 1.21.3
+go 1.23.3
 
 require (
 	github.com/berquerant/goconfig v0.3.0
