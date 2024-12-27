@@ -1,3 +1,6 @@
+[![Go Report Card](https://goreportcard.com/badge/github.com/berquerant/execx)](https://goreportcard.com/report/github.com/berquerant/execx)
+[![Go Reference](https://pkg.go.dev/badge/github.com/berquerant/execx.svg)](https://pkg.go.dev/github.com/berquerant/execx)
+
 # execx
 
 Provides `os/exec.Cmd` wrappers.
