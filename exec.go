@@ -11,7 +11,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//go:generate go run github.com/berquerant/goconfig -field "StdoutConsumer func(Token)|StderrConsumer func(Token)|SplitFunc SplitFunc|SplitSeparator []byte|StdoutWriter io.Writer|StderrWriter io.Writer" -option -output exec_config_generated.go -configOption Option
+//go:generate go run github.com/berquerant/goconfig -field "StdoutConsumer func(Token)|StderrConsumer func(Token)|SplitFunc SplitFunc|StdoutWriter io.Writer|StderrWriter io.Writer" -option -output exec_config_generated.go -configOption Option
 
 // Cmd is an external command.
 type Cmd struct {
@@ -106,7 +106,6 @@ func (Cmd) prepareWriter(result *Result, cfg *Config) (stdout, stderr io.Writer)
 // If [WithStdoutConsumer] set, you can get the standard output of a command without waiting for the command to finish.
 // If [WithStderrConsumer] set, you can get the standard error of a command without waiting for the command to finish.
 // [WithSplitFunc] sets the split function for a scanner used in consumers, default is [bufio.ScanLines].
-// [WithSplitSeparator] sets the separator inserted between tokens when concatenating tokens passed to consumers,
 // default is `[]byte("\n")`.
 // If [WithStdoutWriter] set, write the standard output into it instead of [Result.Stdout].
 // If [WithStderrWriter] set, write the standard error into it instead of [Result.Stderr].
@@ -118,7 +117,6 @@ func (c Cmd) Run(ctx context.Context, opt ...Option) (*Result, error) {
 		StdoutConsumer(func(Token) {}).
 		StderrConsumer(func(Token) {}).
 		SplitFunc(bufio.ScanLines).
-		SplitSeparator([]byte("\n")).
 		StdoutWriter(nil).
 		StderrWriter(nil).
 		Build()
@@ -166,36 +164,15 @@ func (c Cmd) runWithLineConsumers(
 		return nil, fmt.Errorf("%w: stderr pipe", err)
 	}
 
-	var (
-		newScanner = func(r io.Reader) *bufio.Scanner {
-			s := bufio.NewScanner(r)
-			s.Split(cfg.SplitFunc.Get())
-			return s
-		}
-		worker = func(w io.Writer, r io.Reader, consumer func(Token)) func() error {
-			var isTail bool
-			return func() error {
-				scanner := newScanner(r)
-				for scanner.Scan() {
-					line := token(scanner.Bytes())
-					if isTail {
-						_, _ = w.Write(append(cfg.SplitSeparator.Get(), line.Bytes()...))
-					} else {
-						isTail = true
-						_, _ = w.Write(line.Bytes())
-					}
-					consumer(line)
-				}
-				return scanner.Err()
-			}
-		}
-	)
-
-	eg, _ := errgroup.WithContext(ctx)
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("%w: command start", err)
 	}
 
+	worker := func(w io.Writer, r io.Reader, consumer func(Token)) func() error {
+		s := NewScanner(w, r, cfg.SplitFunc.Get(), consumer)
+		return s.Scan
+	}
+	eg, _ := errgroup.WithContext(ctx)
 	eg.Go(worker(stdoutWriter, stdout, cfg.StdoutConsumer.Get()))
 	eg.Go(worker(stderrWriter, stderr, cfg.StderrConsumer.Get()))
 
