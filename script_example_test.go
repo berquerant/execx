@@ -4,9 +4,32 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/berquerant/execx"
 )
+
+func ExampleScript_Runner_args() {
+	script := execx.NewScript(`echo "$*"`, "sh")
+	if err := script.Runner(func(cmd *execx.Cmd) error {
+		cmd.Args = append(cmd.Args, "hello", "world")
+		r, err := cmd.Run(context.TODO())
+		if err != nil {
+			return err
+		}
+		out, err := io.ReadAll(r.Stdout)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%s\n", out)
+		return nil
+	}); err != nil {
+		panic(err)
+	}
+
+	// Output:
+	// hello world
+}
 
 func ExampleScript_Runner() {
 	script := execx.NewScript(
