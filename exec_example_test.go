@@ -27,3 +27,11 @@ func ExampleCmd_Run() {
 	// echo Hello, world!
 	// Hello, world!
 }
+
+func ExampleCmd_Exec() {
+	cmd := execx.New("echo", "Hello, ${NAME}!")
+	cmd.Env.Set("NAME", "world")
+	if err := cmd.Exec(); err != nil {
+		panic(err)
+	}
+}

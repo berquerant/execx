@@ -6,7 +6,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
+	"syscall"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -185,4 +187,17 @@ func (c Cmd) runWithLineConsumers(
 	}
 
 	return result, nil
+}
+
+// Exec invokes execve(2).
+// This ignores Cmd.Stdin.
+func (c Cmd) Exec() error {
+	bin, err := exec.LookPath(c.Args[0])
+	if err != nil {
+		return fmt.Errorf("%w: exec look path %s", err, c.Args[0])
+	}
+	if err := os.Chdir(c.Dir); err != nil {
+		return fmt.Errorf("%w: exec chdir %s", err, c.Dir)
+	}
+	return syscall.Exec(bin, c.Args, c.Env.IntoSlice())
 }
