@@ -23,7 +23,7 @@ func NewTask(name, script string) *Task {
 func (t Task) String() string {
 	return fmt.Sprintf(`%s() {
 %s
-}`, t.Name, internal.IndentN(t.Script, 2))
+}`, t.Name, t.Script)
 }
 
 type Tasks []*Task

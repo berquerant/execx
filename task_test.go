@@ -119,7 +119,7 @@ func TestTasks(t *testing.T) {
 			tasks: execx.NewTasks().
 				Add(execx.NewTask("f", `echo from f`)),
 			want: `f() {
-  echo from f
+echo from f
 }`,
 		},
 		{
@@ -129,11 +129,11 @@ func TestTasks(t *testing.T) {
 				Add(execx.NewTask("g", `echo from g
 echo end`)),
 			want: `f() {
-  echo from f
+echo from f
 }
 g() {
-  echo from g
-  echo end
+echo from g
+echo end
 }`,
 		},
 	} {
