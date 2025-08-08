@@ -3,6 +3,7 @@ package execx_test
 import (
 	"bufio"
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/berquerant/execx"
@@ -16,6 +17,12 @@ func TestScanner(t *testing.T) {
 		split execx.SplitFunc
 		want  []string
 	}{
+		{
+			title: "long long string",
+			split: bufio.ScanLines,
+			input: strings.Repeat("a", bufio.MaxScanTokenSize+1),
+			want:  []string{strings.Repeat("a", bufio.MaxScanTokenSize+1)},
+		},
 		{
 			title: "null input",
 			split: bufio.ScanLines,
