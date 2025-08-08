@@ -1,7 +1,6 @@
 package execx_test
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"io"
@@ -12,12 +11,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func assertReader(t *testing.T, want, got io.Reader) {
+func assertReader(t *testing.T, want, got io.Reader, v ...any) {
 	wantOut, err := io.ReadAll(want)
 	assert.Nil(t, err)
 	gotOut, err := io.ReadAll(got)
 	assert.Nil(t, err)
-	assert.Equal(t, wantOut, gotOut)
+	assert.Equal(t, wantOut, gotOut, v...)
 }
 
 func TestCmd(t *testing.T) {
@@ -43,7 +42,7 @@ func TestCmd(t *testing.T) {
 				name:  "words",
 				stdin: bytes.NewBufferString("word1 word2 "),
 				opt: []execx.Option{
-					execx.WithSplitFunc(bufio.ScanWords),
+					execx.WithDelim(' '),
 				},
 				want: []string{
 					"word1",
@@ -69,64 +68,6 @@ func TestCmd(t *testing.T) {
 	})
 
 	t.Run("Run", func(t *testing.T) {
-		t.Run("earlystop", func(t *testing.T) {
-			const (
-				input = "1,2,die,4"
-				want  = "1,2,die,4"
-			)
-			var (
-				wantLines = []string{"1", "2"}
-			)
-
-			split := func(data []byte, atEOF bool) (int, []byte, error) {
-				i := bytes.IndexByte(data, ',')
-				if i == -1 {
-					if !atEOF {
-						return 0, nil, nil
-					}
-					return 0, data, bufio.ErrFinalToken
-				}
-
-				if string(data[:i]) == "die" {
-					return i + 1, nil, bufio.ErrFinalToken
-				}
-
-				return i + 1, data[:i], nil
-			}
-
-			var outLines []string
-
-			cmd := execx.New("cat", "-")
-			cmd.Stdin = bytes.NewBufferString(input)
-			got, err := cmd.Run(
-				context.TODO(),
-				execx.WithSplitFunc(split),
-				execx.WithStdoutConsumer(func(x execx.Token) {
-					outLines = append(outLines, x.String())
-				}),
-			)
-
-			assert.Nil(t, err)
-
-			if len(outLines) == 3 {
-				// for go 1.21
-				// https://go.dev/doc/go1.22:
-				//   Previously, it would report a final empty token before stopping
-				assert.Equal(t, wantLines, outLines[:2])
-			} else {
-				assert.Equal(t, wantLines, outLines)
-			}
-
-			gotString, err := io.ReadAll(got.Stdout)
-			assert.Nil(t, err)
-			if len(gotString) == 4 {
-				// for go 1.21
-				assert.Equal(t, want, string([]rune(string(gotString))[:3]))
-			} else {
-				assert.Equal(t, want, string(gotString))
-			}
-		})
-
 		t.Run("cancel", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.TODO())
 			cancel()

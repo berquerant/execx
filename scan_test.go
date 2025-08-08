@@ -14,38 +14,37 @@ func TestScanner(t *testing.T) {
 	for _, tc := range []struct {
 		title string
 		input string
-		split execx.SplitFunc
+		delim byte
 		want  []string
 	}{
 		{
 			title: "long long string",
-			split: bufio.ScanLines,
+			delim: '\n',
 			input: strings.Repeat("a", bufio.MaxScanTokenSize+1),
 			want:  []string{strings.Repeat("a", bufio.MaxScanTokenSize+1)},
 		},
 		{
 			title: "null input",
-			split: bufio.ScanLines,
+			delim: '\n',
 		},
 		{
 			title: "a line",
-			split: bufio.ScanLines,
+			delim: '\n',
 			input: `line`,
 			want:  []string{"line"},
 		},
 		{
 			title: "2 lines",
-			split: bufio.ScanLines,
+			delim: '\n',
 			input: `line1
 line2`,
 			want: []string{"line1", "line2"},
 		},
 		{
 			title: "scan words",
-			split: bufio.ScanWords,
-			input: `line1 end
-line2 end`,
-			want: []string{"line1", "end", "line2", "end"},
+			delim: ' ',
+			input: `line1 end line2 end`,
+			want:  []string{"line1", "end", "line2", "end"},
 		},
 	} {
 		t.Run(tc.title, func(t *testing.T) {
@@ -54,7 +53,7 @@ line2 end`,
 				w   bytes.Buffer
 				got []string
 			)
-			s := execx.NewScanner(&w, r, tc.split, func(t execx.Token) {
+			s := execx.NewScanner(&w, r, tc.delim, func(t execx.Token) {
 				got = append(got, t.String())
 			})
 			assert.Nil(t, s.Scan())

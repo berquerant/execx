@@ -1,7 +1,6 @@
 package execx_test
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"io"
@@ -138,32 +137,18 @@ echo err2 2 > /dev/stderr`, "bash"),
 					withStderrWriter: true,
 				},
 				{
-					name: "split by words joint by space",
-					script: execx.NewScript(`cat -
-echo err1 1 > /dev/stderr
-echo err2 2 > /dev/stderr`, "bash"),
-					opt: []execx.Option{
-						execx.WithSplitFunc(bufio.ScanWords),
-					},
-					stdin:        bytes.NewBufferString("line1 1\nline2 2\n"),
-					wantStdout:   bytes.NewBufferString("line1 1\nline2 2\n"),
-					wantStderr:   bytes.NewBufferString("err1 1\nerr2 2\n"),
-					wantOutLines: []string{"line1", "1", "line2", "2"},
-					wantErrLines: []string{"err1", "1", "err2", "2"},
-				},
-				{
 					name: "split by words",
 					script: execx.NewScript(`cat -
 echo err1 1 > /dev/stderr
 echo err2 2 > /dev/stderr`, "bash"),
 					opt: []execx.Option{
-						execx.WithSplitFunc(bufio.ScanWords),
+						execx.WithDelim(' '),
 					},
-					stdin:        bytes.NewBufferString("line1 1\nline2 2\n"),
-					wantStdout:   bytes.NewBufferString("line1 1\nline2 2\n"),
+					stdin:        bytes.NewBufferString("line1 1 line2 2"),
+					wantStdout:   bytes.NewBufferString("line1 1 line2 2"),
 					wantStderr:   bytes.NewBufferString("err1 1\nerr2 2\n"),
 					wantOutLines: []string{"line1", "1", "line2", "2"},
-					wantErrLines: []string{"err1", "1", "err2", "2"},
+					wantErrLines: []string{"err1", "1\nerr2", "2\n"},
 				},
 				{
 					name: "plain",
@@ -215,21 +200,21 @@ echo err2 2 > /dev/stderr`, "bash"),
 						return
 					}
 
-					assert.Equal(t, tc.wantOutLines, gotOutLines)
-					assert.Equal(t, tc.wantErrLines, gotErrLines)
+					assert.Equal(t, tc.wantOutLines, gotOutLines, "out lines")
+					assert.Equal(t, tc.wantErrLines, gotErrLines, "err lines")
 
 					if tc.withStdoutWriter {
-						assertReader(t, tc.wantStdout, &gotStdoutWriter)
-						assertReader(t, bytes.NewBufferString(""), gotResult.Stdout)
+						assertReader(t, tc.wantStdout, &gotStdoutWriter, "stdout")
+						assertReader(t, bytes.NewBufferString(""), gotResult.Stdout, "result stdout")
 					} else {
-						assertReader(t, tc.wantStdout, gotResult.Stdout)
+						assertReader(t, tc.wantStdout, gotResult.Stdout, "result stdout")
 					}
 
-					if tc.withStdoutWriter {
-						assertReader(t, tc.wantStderr, &gotStderrWriter)
-						assertReader(t, bytes.NewBufferString(""), gotResult.Stderr)
+					if tc.withStderrWriter {
+						assertReader(t, tc.wantStderr, &gotStderrWriter, "stderr")
+						assertReader(t, bytes.NewBufferString(""), gotResult.Stderr, "result stderr")
 					} else {
-						assertReader(t, tc.wantStderr, gotResult.Stderr)
+						assertReader(t, tc.wantStderr, gotResult.Stderr, "result stderr")
 					}
 				})
 			}

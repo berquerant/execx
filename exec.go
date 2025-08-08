@@ -13,7 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//go:generate go tool goconfig -field "StdoutConsumer func(Token)|StderrConsumer func(Token)|SplitFunc SplitFunc|StdoutWriter io.Writer|StderrWriter io.Writer" -option -output exec_config_generated.go -configOption Option
+//go:generate go tool goconfig -field "StdoutConsumer func(Token)|StderrConsumer func(Token)|Delim byte|StdoutWriter io.Writer|StderrWriter io.Writer" -option -output exec_config_generated.go -configOption Option
 
 // Cmd is an external command.
 type Cmd struct {
@@ -118,7 +118,7 @@ func (c Cmd) Run(ctx context.Context, opt ...Option) (*Result, error) {
 	config := NewConfigBuilder().
 		StdoutConsumer(func(Token) {}).
 		StderrConsumer(func(Token) {}).
-		SplitFunc(bufio.ScanLines).
+		Delim('\n').
 		StdoutWriter(nil).
 		StderrWriter(nil).
 		Build()
@@ -171,7 +171,7 @@ func (c Cmd) runWithLineConsumers(
 	}
 
 	worker := func(w io.Writer, r io.Reader, consumer func(Token)) func() error {
-		s := NewScanner(w, r, cfg.SplitFunc.Get(), consumer)
+		s := NewScanner(w, r, cfg.Delim.Get(), consumer)
 		return s.Scan
 	}
 	eg, _ := errgroup.WithContext(ctx)
