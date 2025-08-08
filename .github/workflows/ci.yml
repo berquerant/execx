@@ -15,18 +15,13 @@ jobs:
   test:
     timeout-minutes: 5
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version:
-          - "1.24"
     steps:
       - name: Checkout
         uses: actions/checkout@v4.2.2
-      - name: Setup Go ${{ matrix.go-version }}
+      - name: Setup Go
         uses: actions/setup-go@v5.5.0
         with:
-          go-version: ${{ matrix.go-version }}
-          check-latest: true
+          go-version-file: "go.mod"
           cache-dependency-path: go.sum
       - name: Display Go version
         run: go version
