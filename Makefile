@@ -1,5 +1,5 @@
 GOMOD = go mod
-GOTEST = go test -v -cover -race
+GOTEST = go test -cover -race
 
 .PHONY: test
 test:
