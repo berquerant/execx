@@ -67,6 +67,13 @@ func New(name string, arg ...string) *Cmd {
 	}
 }
 
+func (c Cmd) IntoExecCmd(ctx context.Context) *exec.Cmd {
+	cmd, _ := c.prepare(ctx)
+	cmd.Stdout = c.Stdout
+	cmd.Stderr = c.Stderr
+	return cmd
+}
+
 func (c Cmd) prepare(ctx context.Context) (*exec.Cmd, *Result) {
 	args := c.Env.ExpandStrings(c.Args)
 
