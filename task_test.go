@@ -70,7 +70,7 @@ got x
 			t.Run("into script", func(t *testing.T) {
 				var got string
 				assert.Nil(t, tc.tasks.IntoScript("sh").Runner(func(cmd *execx.Cmd) error {
-					r, err := cmd.Run(context.TODO())
+					r, err := cmd.Run(context.TODO(), execx.WithCaptureStdout(true))
 					if err != nil {
 						return err
 					}
@@ -86,7 +86,7 @@ got x
 			t.Run("from string", func(t *testing.T) {
 				var got string
 				execx.NewScript(tc.tasks.String(), "sh").Runner(func(cmd *execx.Cmd) error {
-					r, err := cmd.Run(context.TODO())
+					r, err := cmd.Run(context.TODO(), execx.WithCaptureStdout(true))
 					if err != nil {
 						return err
 					}

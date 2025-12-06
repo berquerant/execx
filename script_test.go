@@ -15,7 +15,7 @@ func TestScript(t *testing.T) {
 	assertScriptStdout := func(t *testing.T, want io.Reader, script *execx.Script) {
 		var stdout io.Reader
 		assert.Nil(t, script.Runner(func(cmd *execx.Cmd) error {
-			f, err := cmd.Run(context.TODO())
+			f, err := cmd.Run(context.TODO(), execx.WithCaptureStdout(true))
 			if err != nil {
 				return err
 			}
@@ -30,7 +30,7 @@ func TestScript(t *testing.T) {
 			script := execx.NewScript("echo arg=$*", "sh")
 			err := script.Runner(func(cmd *execx.Cmd) error {
 				cmd.Args = append(cmd.Args, "ARG")
-				r, err := cmd.Run(context.TODO())
+				r, err := cmd.Run(context.TODO(), execx.WithCaptureStdout(true))
 				if err != nil {
 					return err
 				}
@@ -52,7 +52,7 @@ func TestScript(t *testing.T) {
 			for i := 0; i < 8; i++ {
 				eg.Go(func() error {
 					return script.Runner(func(cmd *execx.Cmd) error {
-						r, err := cmd.Run(context.TODO())
+						r, err := cmd.Run(context.TODO(), execx.WithCaptureStdout(true))
 						if err != nil {
 							return err
 						}
@@ -183,10 +183,14 @@ echo err2 2 > /dev/stderr`, "bash"),
 							gotErrLines = append(gotErrLines, x.String())
 						}))
 						if tc.withStdoutWriter {
-							opt = append(opt, execx.WithStdoutWriter(&gotStdoutWriter))
+							cmd.Stdout = &gotStdoutWriter
+						} else {
+							opt = append(opt, execx.WithCaptureStdout(true))
 						}
 						if tc.withStderrWriter {
-							opt = append(opt, execx.WithStderrWriter(&gotStderrWriter))
+							cmd.Stderr = &gotStderrWriter
+						} else {
+							opt = append(opt, execx.WithCaptureStderr(true))
 						}
 
 						got, err := cmd.Run(context.TODO(), opt...)
@@ -249,7 +253,7 @@ line4
 
 				assert.Nil(t, script.Runner(func(cmd *execx.Cmd) error {
 					cmd.Stdin = bytes.NewBufferString(stdin)
-					r, err := cmd.Run(context.TODO())
+					r, err := cmd.Run(context.TODO(), execx.WithCaptureStdout(true), execx.WithCaptureStderr(true))
 					if err != nil {
 						return err
 					}

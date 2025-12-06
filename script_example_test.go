@@ -13,7 +13,7 @@ func ExampleScript_Runner_args() {
 	script := execx.NewScript(`echo "$*"`, "sh")
 	if err := script.Runner(func(cmd *execx.Cmd) error {
 		cmd.Args = append(cmd.Args, "hello", "world")
-		r, err := cmd.Run(context.TODO())
+		r, err := cmd.Run(context.TODO(), execx.WithCaptureStdout(true))
 		if err != nil {
 			return err
 		}

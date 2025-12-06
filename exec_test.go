@@ -80,7 +80,7 @@ func TestCmd(t *testing.T) {
 			cmd := execx.New("echo", "${test_cmd_append_env1}")
 			cmd.Env.Merge(execx.EnvFromEnviron())
 			cmd.Env.Set("test_cmd_append_env1", "added:${test_cmd_append_env1}")
-			r, err := cmd.Run(context.TODO())
+			r, err := cmd.Run(context.TODO(), execx.WithCaptureStdout(true))
 			assert.Nil(t, err)
 			assertReader(t, bytes.NewBufferString("added:append1\n"), r.Stdout)
 		})
@@ -133,7 +133,7 @@ func TestCmd(t *testing.T) {
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				got, err := tc.cmd.Run(context.TODO())
+				got, err := tc.cmd.Run(context.TODO(), execx.WithCaptureStdout(true), execx.WithCaptureStderr(true))
 				if tc.err {
 					t.Logf("err=%v", err)
 					assert.NotNil(t, err)

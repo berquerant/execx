@@ -12,7 +12,7 @@ import (
 func ExampleCmd_Run() {
 	cmd := execx.New("echo", "Hello, ${NAME}!")
 	cmd.Env.Set("NAME", "world")
-	r, err := cmd.Run(context.TODO())
+	r, err := cmd.Run(context.TODO(), execx.WithCaptureStdout(true))
 	if err != nil {
 		panic(err)
 	}

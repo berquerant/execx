@@ -15,6 +15,9 @@ type Scanner struct {
 }
 
 func NewScanner(w io.Writer, r io.Reader, delim byte, consumer func(Token)) *Scanner {
+	if w == nil {
+		w = &NullBuffer{}
+	}
 	return &Scanner{
 		w:        w,
 		r:        r,
