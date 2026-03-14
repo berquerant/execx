@@ -49,7 +49,7 @@ func TestScript(t *testing.T) {
 			script.KeepScriptFile = true
 
 			var eg errgroup.Group
-			for i := 0; i < 8; i++ {
+			for range 8 {
 				eg.Go(func() error {
 					return script.Runner(func(cmd *execx.Cmd) error {
 						r, err := cmd.Run(context.TODO(), execx.WithCaptureStdout(true))
