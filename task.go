@@ -89,8 +89,8 @@ func (t ExecutableTasks) asString(dry bool) string {
 			w(`%s="%s"`, k, internal.EscapeQuote(v))
 		}
 	}
-	w(t.Tasks.String())
-	w(strings.Join(t.Entrypoint, "\n"))
+	w("%s", t.Tasks.String())
+	w("%s", strings.Join(t.Entrypoint, "\n"))
 
 	return b.String()
 }
